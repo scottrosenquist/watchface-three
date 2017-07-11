@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Watchface Three</string>
+    <!--<string name="message">Watch face tapped</string>-->
+    <string name="my_analog_name">Aaa Watchface Three</string>
+</resources>
