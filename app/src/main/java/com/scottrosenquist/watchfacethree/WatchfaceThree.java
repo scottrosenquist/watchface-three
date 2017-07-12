@@ -20,20 +20,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorMatrix;
-import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.support.v7.graphics.Palette;
 import android.support.wearable.watchface.CanvasWatchFaceService;
-import android.support.wearable.watchface.WatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.view.Gravity;
 import android.view.SurfaceHolder;
@@ -42,7 +36,6 @@ import android.view.SurfaceHolder;
 import java.lang.ref.WeakReference;
 import java.util.Calendar;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Analog watch face with a ticking second hand. In ambient mode, the second hand isn't
@@ -55,7 +48,7 @@ public class WatchfaceThree extends CanvasWatchFaceService {
      * Update rate in milliseconds for interactive mode. We update once a second to advance the
      * second hand.
      */
-    private static final long INTERACTIVE_BEATS_PER_SECOND = 4;
+    private static final long INTERACTIVE_BEATS_PER_SECOND = 10;
     private static final long INTERACTIVE_UPDATE_RATE_MS = 1000 / INTERACTIVE_BEATS_PER_SECOND;
 
     /**
@@ -92,7 +85,9 @@ public class WatchfaceThree extends CanvasWatchFaceService {
         private static final float HOUR_STROKE_WIDTH = 10f;
         private static final float MINUTE_STROKE_WIDTH = 6f;
         private static final float SECOND_STROKE_WIDTH = 3f;
-        private static final float TICK_STROKE_WIDTH = 2f;
+        private static final float SECONDS_TICK_STROKE_WIDTH = 2.5f;
+        private static final float SECONDS_NUMBER_TICK_FONT_SIZE = 15f;
+        private static final float HOURS_TICK_STROKE_WIDTH = 6f;
         private static final float CIRCLE_STROKE_WIDTH = 2f;
 
         private static final float CENTER_GAP_AND_CIRCLE_RADIUS = 20f;
@@ -119,7 +114,9 @@ public class WatchfaceThree extends CanvasWatchFaceService {
         private Paint hourPaint;
         private Paint minutePaint;
         private Paint secondPaint;
-        private Paint tickPaint;
+        private Paint secondsTickPaint;
+        private Paint secondsNumberTickPaint;
+        private Paint hoursTickPaint;
         private Paint circlePaint;
         private Paint backgroundPaint;
         private boolean ambient;
@@ -145,25 +142,36 @@ public class WatchfaceThree extends CanvasWatchFaceService {
             hourPaint.setColor(watchHandColor);
             hourPaint.setStrokeWidth(HOUR_STROKE_WIDTH);
             hourPaint.setAntiAlias(true);
-            hourPaint.setStrokeCap(Paint.Cap.ROUND);
+            hourPaint.setStrokeCap(Paint.Cap.BUTT);
 
             minutePaint = new Paint();
             minutePaint.setColor(watchHandColor);
             minutePaint.setStrokeWidth(MINUTE_STROKE_WIDTH);
             minutePaint.setAntiAlias(true);
-            minutePaint.setStrokeCap(Paint.Cap.ROUND);
+            minutePaint.setStrokeCap(Paint.Cap.BUTT);
 
             secondPaint = new Paint();
             secondPaint.setColor(watchHandHighlightColor);
             secondPaint.setStrokeWidth(SECOND_STROKE_WIDTH);
             secondPaint.setAntiAlias(true);
-            secondPaint.setStrokeCap(Paint.Cap.ROUND);
+            secondPaint.setStrokeCap(Paint.Cap.BUTT);
 
-            tickPaint = new Paint();
-            tickPaint.setColor(watchHandColor);
-            tickPaint.setStrokeWidth(TICK_STROKE_WIDTH);
-            tickPaint.setAntiAlias(true);
-            tickPaint.setStyle(Paint.Style.STROKE);
+            secondsTickPaint = new Paint();
+            secondsTickPaint.setColor(watchHandColor);
+            secondsTickPaint.setStrokeWidth(SECONDS_TICK_STROKE_WIDTH);
+            secondsTickPaint.setAntiAlias(true);
+            secondsTickPaint.setStyle(Paint.Style.STROKE);
+
+            secondsNumberTickPaint = new Paint();
+            secondsNumberTickPaint.setColor(watchHandColor);
+            secondsNumberTickPaint.setAntiAlias(true);
+            secondsNumberTickPaint.setTextSize(SECONDS_NUMBER_TICK_FONT_SIZE);
+
+            hoursTickPaint = new Paint();
+            hoursTickPaint.setColor(watchHandColor);
+            hoursTickPaint.setStrokeWidth(HOURS_TICK_STROKE_WIDTH);
+            hoursTickPaint.setAntiAlias(true);
+            hoursTickPaint.setStyle(Paint.Style.STROKE);
 
             circlePaint = new Paint();
             circlePaint.setColor(watchHandColor);
@@ -209,32 +217,34 @@ public class WatchfaceThree extends CanvasWatchFaceService {
                 hourPaint.setColor(Color.WHITE);
                 minutePaint.setColor(Color.WHITE);
                 secondPaint.setColor(Color.WHITE);
-                tickPaint.setColor(Color.WHITE);
+                secondsTickPaint.setColor(Color.WHITE);
+                secondsNumberTickPaint.setColor(Color.WHITE);
+                hoursTickPaint.setColor(Color.WHITE);
                 circlePaint.setColor(Color.WHITE);
 
                 hourPaint.setAntiAlias(!lowBitAmbient);
                 minutePaint.setAntiAlias(!lowBitAmbient);
                 secondPaint.setAntiAlias(!lowBitAmbient);
-                tickPaint.setAntiAlias(!lowBitAmbient);
+                secondsTickPaint.setAntiAlias(!lowBitAmbient);
+                secondsNumberTickPaint.setAntiAlias(!lowBitAmbient);
+                hoursTickPaint.setAntiAlias(!lowBitAmbient);
                 circlePaint.setAntiAlias(!lowBitAmbient);
-
-                hourPaint.clearShadowLayer();
-                minutePaint.clearShadowLayer();
-                secondPaint.clearShadowLayer();
-                tickPaint.clearShadowLayer();
-                circlePaint.clearShadowLayer();
 
             } else {
                 hourPaint.setColor(watchHandColor);
                 minutePaint.setColor(watchHandColor);
                 secondPaint.setColor(watchHandHighlightColor);
-                tickPaint.setColor(watchHandColor);
+                secondsTickPaint.setColor(watchHandColor);
+                secondsNumberTickPaint.setColor(watchHandColor);
+                hoursTickPaint.setColor(watchHandColor);
                 circlePaint.setColor(watchHandColor);
 
                 hourPaint.setAntiAlias(true);
                 minutePaint.setAntiAlias(true);
                 secondPaint.setAntiAlias(true);
-                tickPaint.setAntiAlias(true);
+                secondsTickPaint.setAntiAlias(true);
+                secondsNumberTickPaint.setAntiAlias(true);
+                hoursTickPaint.setAntiAlias(true);
                 circlePaint.setAntiAlias(true);
             }
         }
@@ -277,13 +287,18 @@ public class WatchfaceThree extends CanvasWatchFaceService {
              * cases where you want to allow users to select their own photos, this dynamically
              * creates them on top of the photo.
              */
-            float hourTickRadius = centerX - 40;
-            float innerTickRadius = centerX - 20;
-            float outerTickRadius = centerX;
+            float innerHourTickRadius = centerX - 60;
+            float outerHourTickRadius = centerX - 25;
+            float innerSecondTickRadius = centerX - 20;
+            float outerSecondTickRadius = centerX;
+            float secondsNumberTickRadius = centerX - 10;
+            int secondsNumberRotation = 0;
             for (int tickIndex = 0; tickIndex < 60; tickIndex++) {
                 float tickRot = (float) (tickIndex * Math.PI * 2 / 60);
                 float innerX;
                 float innerY;
+                float outerX;
+                float outerY;
                 switch (tickIndex) {
                     case 0:
                     case 5:
@@ -297,36 +312,83 @@ public class WatchfaceThree extends CanvasWatchFaceService {
                     case 45:
                     case 50:
                     case 55:
-                        innerX = (float) Math.sin(tickRot) * hourTickRadius;
-                        innerY = (float) -Math.cos(tickRot) * hourTickRadius;
+                        innerX = (float) Math.sin(tickRot) * innerHourTickRadius;
+                        innerY = (float) -Math.cos(tickRot) * innerHourTickRadius;
+                        outerX = (float) Math.sin(tickRot) * outerHourTickRadius;
+                        outerY = (float) -Math.cos(tickRot) * outerHourTickRadius;
+                        canvas.drawLine(centerX + innerX, centerY + innerY, centerX + outerX, centerY + outerY, hoursTickPaint);
+
+                        String tickString = String.valueOf(tickIndex);
+                        Rect textBounds = new Rect();
+                        secondsNumberTickPaint.getTextBounds(tickString, 0, tickString.length(), textBounds);
+                        float secondsNumberX = (float) Math.sin(tickRot) * secondsNumberTickRadius;
+                        float secondsNumberY = (float) -Math.cos(tickRot) * secondsNumberTickRadius;
+                        float secondsNumberAdjustedX = secondsNumberX - textBounds.width() / 2f - textBounds.left;
+                        float secondsNumberAdjustedY = secondsNumberY + textBounds.height() / 2f - textBounds.bottom;
+
+                        canvas.save();
+
+                        switch (tickIndex) {
+                            case 20:
+                            case 25:
+                            case 30:
+                            case 35:
+                            case 40:
+                                secondsNumberRotation = tickIndex * 6 + 180;
+                                break;
+                            default:
+                                secondsNumberRotation = tickIndex * 6;
+                                break;
+                        }
+
+                        canvas.rotate(secondsNumberRotation, centerX + secondsNumberX, centerY + secondsNumberY);
+
+                        canvas.drawText(String.valueOf(tickIndex), centerX + secondsNumberAdjustedX, centerY + secondsNumberAdjustedY, secondsNumberTickPaint);
+
+                        canvas.restore();
                         break;
                     default:
-                        innerX = (float) Math.sin(tickRot) * innerTickRadius;
-                        innerY = (float) -Math.cos(tickRot) * innerTickRadius;
+                        innerX = (float) Math.sin(tickRot) * innerSecondTickRadius;
+                        innerY = (float) -Math.cos(tickRot) * innerSecondTickRadius;
+                        outerX = (float) Math.sin(tickRot) * outerSecondTickRadius;
+                        outerY = (float) -Math.cos(tickRot) * outerSecondTickRadius;
+                        canvas.drawLine(centerX + innerX, centerY + innerY, centerX + outerX, centerY + outerY, secondsTickPaint);
                         break;
                 }
-                float outerX = (float) Math.sin(tickRot) * outerTickRadius;
-                float outerY = (float) -Math.cos(tickRot) * outerTickRadius;
-                canvas.drawLine(centerX + innerX, centerY + innerY,
-                        centerX + outerX, centerY + outerY, tickPaint);
+
             }
 
             /*
              * These calculations reflect the rotation in degrees per unit of time, e.g.,
              * 360 / 60 = 6 and 360 / 12 = 30.
              */
-            final float seconds =
-                    (calendar.get(Calendar.SECOND) + calendar.get(Calendar.MILLISECOND) / 1000f);
+
+//            calendar.setTimeInMillis(54569000); // Screen Shot Time
+//            calendar.setTimeInMillis(61200000); // Midnight (Hand Alignment)
+
+            final float seconds = (calendar.get(Calendar.SECOND) + calendar.get(Calendar.MILLISECOND) / 1000f);
             final float secondsRotation = seconds * 6f;
 
-            final float minutesRotation = calendar.get(Calendar.MINUTE) * 6f;
+            final float minuteHandOffset = calendar.get(Calendar.SECOND) / 10f;
+            final float minutesRotation = calendar.get(Calendar.MINUTE) * 6f + minuteHandOffset;
 
             final float hourHandOffset = calendar.get(Calendar.MINUTE) / 2f;
             final float hoursRotation = (calendar.get(Calendar.HOUR) * 30) + hourHandOffset;
 
+            drawHourHand(canvas, hoursRotation);
+
+            drawMinuteHand(canvas, minutesRotation);
+
             /*
-             * Save the canvas state before we can begin to rotate it.
+             * Ensure the "seconds" hand is drawn only when we are in interactive mode.
+             * Otherwise, we only update the watch face once a minute.
              */
+            if (!ambient) {
+                drawSecondHand(canvas, secondsRotation);
+            }
+        }
+
+        private void drawHourHand(Canvas canvas, float hoursRotation) {
             canvas.save();
 
             canvas.rotate(hoursRotation, centerX, centerY);
@@ -337,7 +399,13 @@ public class WatchfaceThree extends CanvasWatchFaceService {
                     centerY - hourHandLength,
                     hourPaint);
 
-            canvas.rotate(minutesRotation - hoursRotation, centerX, centerY);
+            canvas.restore();
+        }
+
+        private void drawMinuteHand(Canvas canvas, float minutesRotation) {
+            canvas.save();
+
+            canvas.rotate(minutesRotation, centerX, centerY);
             canvas.drawLine(
                     centerX,
                     centerY - CENTER_GAP_AND_CIRCLE_RADIUS,
@@ -345,33 +413,12 @@ public class WatchfaceThree extends CanvasWatchFaceService {
                     centerY - minuteHandLength,
                     minutePaint);
 
-            /*
-             * Ensure the "seconds" hand is drawn only when we are in interactive mode.
-             * Otherwise, we only update the watch face once a minute.
-             */
-            if (!ambient) {
-                drawSecondHand(canvas, secondsRotation);
-//                canvas.rotate(secondsRotation - minutesRotation, centerX, centerY);
-//                canvas.drawLine(
-//                        centerX,
-//                        centerY - CENTER_GAP_AND_CIRCLE_RADIUS,
-//                        centerX,
-//                        centerY - secondHandLength,
-//                        secondPaint);
-
-            }
-//            canvas.drawCircle(
-//                    centerX,
-//                    centerY,
-//                    CENTER_GAP_AND_CIRCLE_RADIUS,
-//                    circlePaint);
-
-            /* Restore the canvas' original orientation. */
             canvas.restore();
         }
 
         private void drawSecondHand(Canvas canvas, float secondsRotation) {
             canvas.save();
+
             canvas.rotate(secondsRotation, centerX, centerY);
             canvas.drawLine(
                     centerX,
@@ -379,6 +426,7 @@ public class WatchfaceThree extends CanvasWatchFaceService {
                     centerX,
                     centerY - secondHandLength,
                     secondPaint);
+
             canvas.restore();
         }
 
